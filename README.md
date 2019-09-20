@@ -1,14 +1,67 @@
-# README
+# Stack Output External Region
 
-Add your resolver readme here. Remember to include the following:
+This resolver fetches the value of an output from a different Stack in a different region. You can specify a optional
+AWS profile to connect to a different account. It works the same way as `!stack_output_external` but with the added region parameter. This is so you can reference a stack in another region other than the region defined in the stack configuration. It also maintains the optional extra profile parameter that `!stack_output_external` has.
 
-- Tell people how to install it (e.g. pip install ...).
-- Be clear about the purpose of the resolver, its capabilities and limitations.
-- Tell people how to use it.
-- Give examples of the resolver in use.
+Here is a simple example use:
 
-Read our wiki to learn how to use this repo:
-https://github.com/Sceptre/project/wiki/Sceptre-Resolver-Template
+```yaml
+# config/dev/us-east-1/example-io-zone.yaml
+template_path: hosted-zone.yaml
+profile: dev
+parameters:
+  Name: example.io
+```
+```yaml
+# templates/hosted-zone.yaml
+...
 
-If you have any questions or encounter an issue
-[please open an issue](https://github.com/Sceptre/project/issues/new)
+Outputs:
+  HostedZoneID:
+    Description: Hosted zone ID
+    Value: !Ref HostedZone
+```
+```yaml
+# config/dev/us-west-2/db-dns.yaml
+
+region: us-west-2
+profile: dev
+parameters:
+  HostedZoneID: !stack_output_external_region dev-us-east-1-example-com-zone::HostedZoneID us-east-1
+```
+
+Here is another example use with profile
+
+```yaml
+# config/internal/us-east-1/nessus-scanner.yaml
+template_path: ec2-instance.yaml
+profile: internal
+parameters:
+  ...
+```
+```yaml
+# templates/ec2-instance.yaml
+...
+
+Outputs:
+  InstanceId:
+    Description: Instance ID
+    Value: !Ref Instance
+  PrivateIp:
+    Description: Instance private IP
+    Value: !GetAtt Instance.PrivateIp
+  PublicIp:
+    Description: Instance public IP (EIP)
+    Value: !Ref ElasticIP
+```
+```yaml
+# config/dev/us-west-2/app-server.yaml
+template_path: ec2-instance.yaml
+profile: prod
+parameters:
+  AllowAccess:
+    - address: 0.0.0.0/0
+      port: 80
+    - address: !stack_group_external_region internal-us-east-1-nessus-scanner::PrivateIp internal
+      port: 22
+```
